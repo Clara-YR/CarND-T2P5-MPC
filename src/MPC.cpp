@@ -208,11 +208,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   //std::cout << "the approximation solution: " << solution.x << std::endl;
 
-  // MPC predicted x and y
-  for(int i=0; i< N; i++) {
-    predict_x.push_back(solution.x[i]);
-    predict_y.push_back(solution.x[N+i]);
-  }
+  std::cout << "solution.x : \n" << solution.x << std::endl;
 
   std::cout << "delta = " << solution.x[delta_start] << ", a = " << solution.x[a_start] << std::endl;
   return {solution.x[delta_start], solution.x[a_start]};
