@@ -85,5 +85,32 @@ Next the optimization solver is called. The solver uses the initial state `[x_1,
 The solver we'll use is called __IPOpt__.
 
 
+##IPOpt
 
+`solve_result` is a class that contains information about solve problem result. Refering [solve_result.hpp](https://www.coin-or.org/CppAD/Doc/doxydoc/html/solve__result_8hpp_source.html)
 
+```
+/// the approximation solution
+Dvector x;
+```
+I use the very first delta and acceleration  in `solve_result.x`.  The structure of `solve_result.x` is similar to `vars`. So the index of the very first delta and acceleration is also `delta_start` and `a_start`.
+
+##Visualization
+
+We can display these connected point paths in the simulator by sending a list of optional x and y values to the `mpc_x`, `mpc_y`, `next_x`, and `next_y` fields in the C++ main script.
+
+The `mpc_x` and `mpc_y` variables display a line projection in green. The `next_x` and `next_y` variables display a line projection in yellow.
+
+I send values to them as below:
+
+```
+//Display the MPC predicted trajectory
+vector<double> mpc_x_vals = mpc.predict_x;
+vector<double> mpc_y_vals = mpc.predict_y;
+```
+
+```
+//Display the waypoints/reference line
+vector<double> next_x_vals = ptsx;
+vector<double> next_y_vals = ptsy;
+```

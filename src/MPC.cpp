@@ -11,13 +11,13 @@ double dt = 0.05;
 
 // variable start index in `vars`
 int x_start = 0;  // 0 ~ N-1
-int y_start = N;  // N ~ 2N-1
-int psi_start = 2 * N;  // 2N ~ 3N-1
-int v_start = 3 * N;  // 3N ~ 4N-1
-int cte_start = 4 * N;  // 4N ~ 5N-1
-int epsi_start = 5 * N;  // 5N ~ 6N-1
-int delta_start = 6 * N;  // 6N ~ 7N-2
-int a_start = 7 * N - 1;  // 7N-1 ~ 8N-2
+int y_start = static_cast<int>(N);  // N ~ 2N-1
+int psi_start = static_cast<int>(2 * N);  // 2N ~ 3N-1
+int v_start = static_cast<int>(3 * N);  // 3N ~ 4N-1
+int cte_start = static_cast<int>(4 * N);  // 4N ~ 5N-1
+int epsi_start = static_cast<int>(5 * N);  // 5N ~ 6N-1
+int delta_start = static_cast<int>(6 * N);  // 6N ~ 7N-2
+int a_start = static_cast<int>(7 * N - 1);  // 7N-1 ~ 8N-2
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -68,8 +68,40 @@ class FG_eval {
     // Minimize the value gap between sequential actuations.
     for (int t=1; t < N-1; t++) {
       // cost += D_delta^2 + D_a^2
-      fg[0] += CppAD::pow(vars[delta_start + t] - vars[delta_start + t-1], 2);
-      fg[0] += CppAD::pow(vars[a_start + t] - vars[a_start + t-1], 2);
+      fg[0] += CppAD::pow((vars[delta_start + t] - vars[delta_start + t-1]), 2);  // TUNE here !
+      fg[0] += CppAD::pow((vars[a_start + t] - vars[a_start + t-1]), 2);
+    }
+
+    for (int t=1; t < N; t++) {
+      // The state at time t+1
+      AD<double> x_1 = vars[x_start + t];
+      AD<double> y_1 = vars[y_start + t];
+      AD<double> psi_1 = vars[psi_start + t];
+      AD<double> v_1 = vars[v_start + t];
+      AD<double> cte_1 = vars[cte_start + t];
+      AD<double> epsi_1 = vars[epsi_start + t];
+
+      // The state at time t
+      AD<double> x_0 = vars[x_start + t-1];
+      AD<double> y_0 = vars[y_start + t-1];
+      AD<double> psi_0 = vars[psi_start + t-1];
+      AD<double> v_0 = vars[v_start + t-1];
+      AD<double> cte_0 = vars[cte_start + t-1];
+      AD<double> epsi_0 = vars[epsi_start + t-1];
+
+      // Only consider the actuation at time t.
+      AD<double> delta_0 = vars[delta_start + t-1];
+      AD<double> a_0 = vars[a_start + t-1];
+
+      AD<double> f_0 = coeffs[0] + coeffs[1] * x_0;
+      AD<double> psi_des_0 = CppAD::atan(coeffs[1]);
+      // state[t+1] - prediction[t+1|t]
+      fg[1 + x_start + t] = x_1 - (x_0 + v_0 * CppAD::cos(psi_0) * dt);
+      fg[1 + y_start + t] = y_1 - (y_0 + v_0 * CppAD::sin(psi_0) * dt);
+      fg[1 + psi_start + t] = psi_1 - (psi_0 - v_0 * delta_0 / Lf * dt);  // delta is positive we rotate counter-clockwise, or turn left
+      fg[1 + v_start + t] = v_1 - (v_0 + a_0 * dt);
+      fg[1 + cte_start + t] = cte_1 - ((f_0 - y_0) + (v_0 * CppAD::sin(epsi_0) * dt));
+      fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) + v_0 * delta_0 / Lf * dt);
     }
   }
 };
@@ -93,25 +125,41 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   size_t n_vars = 8 * N - 2;
 
   // TODO: Set the number of constraints
-  // (N-1) steering angle constriants and (N-1) acceleration constraints
-  size_t n_constraints = 2 * (N-1);
-
+  size_t n_constraints = 6 * N;
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
-  for (int i = 0; i < n_vars; i++) {
+  for (i=0; i<n_vars; i++) {
     vars[i] = 0;
   }
+
+  // set the initial variable values
+  vars[x_start] = state[0];
+  vars[y_start] = state[1];
+  vars[psi_start] = state[2];
+  vars[v_start] = state[3];
+  vars[cte_start] = state[4];
+  vars[epsi_start] = state[5];
 
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
+  // set the range of values delta to [-25, 25] in radians
+  for (i=delta_start; i < a_start; i++) {
+    vars_lowerbound[i] = -0.436332;  // -25/180 * PI
+    vars_upperbound[i] =  0.436332;  //  25/180 * PI
+  }
+  // set the range of values a to [-1, 1]
+  for (i=a_start; i<n_vars; i++) {
+    vars_lowerbound[i] = -1;
+    vars_upperbound[i] = 1;
+  }
 
   // Lower and upper limits for the constraints
   // Should be 0 besides initial state.
   Dvector constraints_lowerbound(n_constraints);
   Dvector constraints_upperbound(n_constraints);
-  for (int i = 0; i < n_constraints; i++) {
+  for (i=0; i < n_constraints; i++) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
@@ -157,5 +205,16 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {};
+
+  //std::cout << "the approximation solution: " << solution.x << std::endl;
+
+  // MPC predicted x and y
+  for(int i=0; i< N; i++) {
+    predict_x.push_back(solution.x[i]);
+    predict_y.push_back(solution.x[N+i]);
+  }
+
+  std::cout << "delta = " << solution.x[delta_start] << ", a = " << solution.x[a_start] << std::endl;
+  return {solution.x[delta_start], solution.x[a_start]};
 }
+
