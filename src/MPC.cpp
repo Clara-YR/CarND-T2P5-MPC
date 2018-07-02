@@ -46,6 +46,13 @@ class FG_eval {
 
     // initial cost
     fg[0] = 0;
+    fg[1 + x_start] = vars[x_start];
+    fg[1 + y_start] = vars[y_start];
+    fg[1 + psi_start] = vars[psi_start];
+    fg[1 + v_start] = vars[v_start];
+    fg[1 + cte_start] = vars[cte_start];
+    fg[1 + epsi_start] = vars[epsi_start];
+
     // speed reference
     double ref_v = 35;
 
@@ -66,10 +73,10 @@ class FG_eval {
     }
 
     // Minimize the value gap between sequential actuations.
-    for (int t=1; t < N-1; t++) {
+    for (int t=0; t < N-2; t++) {
       // cost += D_delta^2 + D_a^2
-      fg[0] += 500 * CppAD::pow((vars[delta_start + t] - vars[delta_start + t-1]), 2);  // TUNE here !
-      fg[0] += CppAD::pow((vars[a_start + t] - vars[a_start + t-1]), 2);
+      fg[0] += 500 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+      fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
     }
 
     for (int t=1; t < N; t++) {
@@ -95,7 +102,8 @@ class FG_eval {
 
       AD<double> f_0 = coeffs[0] + coeffs[1] * x_0;
       AD<double> psi_des_0 = CppAD::atan(coeffs[1]);
-      // state[t+1] - prediction[t+1|t]
+
+      // constraints = state[t+1] - prediction[t+1|t]
       fg[1 + x_start + t] = x_1 - (x_0 + v_0 * CppAD::cos(psi_0) * dt);
       fg[1 + y_start + t] = y_1 - (y_0 + v_0 * CppAD::sin(psi_0) * dt);
       fg[1 + psi_start + t] = psi_1 - (psi_0 - v_0 * delta_0 / Lf * dt);  // delta is positive we rotate counter-clockwise, or turn left
@@ -125,7 +133,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   size_t n_vars = 8 * N - 2;
 
   // TODO: Set the number of constraints
-  size_t n_constraints = 6 * N;
+  // the number of constraints = fg.size()
+  size_t n_constraints = 6 * N + 1;
+
   // Initial value of the independent variables.
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
