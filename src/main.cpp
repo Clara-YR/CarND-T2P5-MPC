@@ -100,11 +100,11 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          int n_pt = ptsx.size();
+
           // convert from map to coordinates, px, py, psi = 0
-          Eigen::VectorXd ptsx_c(n_pt);
-          Eigen::VectorXd ptsy_c(n_pt);
-          for (int i=0; i<n_pt; i++) {
+          Eigen::VectorXd ptsx_c(ptsx.size());
+          Eigen::VectorXd ptsy_c(ptsx.size());
+          for (int i=0; i<ptsx.size(); i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
             ptsx_c[i] = dx * cos(psi) + dy * sin(psi);

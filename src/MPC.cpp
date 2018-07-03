@@ -44,15 +44,8 @@ class FG_eval {
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
 
-    // initial cost
+    // initial cost fg[0]
     fg[0] = 0;
-    fg[1 + x_start] = vars[x_start];
-    fg[1 + y_start] = vars[y_start];
-    fg[1 + psi_start] = vars[psi_start];
-    fg[1 + v_start] = vars[v_start];
-    fg[1 + cte_start] = vars[cte_start];
-    fg[1 + epsi_start] = vars[epsi_start];
-
     // speed reference
     double ref_v = 35;
 
@@ -79,6 +72,15 @@ class FG_eval {
       fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
     }
 
+    // set the 1st value for each variable
+    fg[1 + x_start] = vars[x_start];
+    fg[1 + y_start] = vars[y_start];
+    fg[1 + psi_start] = vars[psi_start];
+    fg[1 + v_start] = vars[v_start];
+    fg[1 + cte_start] = vars[cte_start];
+    fg[1 + epsi_start] = vars[epsi_start];
+
+    // set the 2nd ~ Nth values for each variable
     for (int t=1; t < N; t++) {
       // The state at time t+1
       AD<double> x_1 = vars[x_start + t];
