@@ -2,7 +2,7 @@
 
 [image1]: ./ReadmeImages/MPC_setup.png "MPC Setup"
 [image2]: ./ReadmeImages/MPC_loop.png "MPC Loop"
-[image3]: ./ReadmeImages/model.png 
+[image3]: ./ReadmeImages/Model.png 
 
 
 # CarND-Controls-MPC
@@ -34,8 +34,9 @@ Par 2 __Code in MPC.cpp__
 - 2.5 [Constraints](#constraints)
 - 2.6 [Limits for Variables](#variable_limits)
 - 2.7 [IPOpt Returns Actuator Values](#ipopt)
+- 2.8 [Tuning MPC](#tune)
 
-## Code in main.cpp
+## Part 1. Code in main.cpp
 
 
 <a name="coordinate_transformation"></a>
@@ -132,12 +133,12 @@ We can display these connected point paths in the simulator by sending a list of
 The `mpc_x` and `mpc_y` variables display a line projection in green. The `next_x` and `next_y` variables display a line projection in yellow.
 
 
-## Code in MPC.cpp
+## Part 2. Code in MPC.cpp
 
 MPC (model predictive controller)
 
 ![alt text][image1]
-![alt text][image2]
+
 
 <a name="N&dt"></a>
 ### 2.1 Set N & dt
@@ -161,10 +162,9 @@ double dt = 0.05;
 
 _code in MPC.cpp line 8~20_
 
-|variable in `state`|x|y|𝜓|v|cte|e𝜓|𝛿|a|
+|variable in `vars`|x|y|𝜓|v|cte|e𝜓|𝛿|a|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|number|N|N|N|N|N|N|N-1|N-1|
-|index|0 ~ N-1|N ~ 2N-1|2N ~ 3N-1|3N ~ 4N-1|4N ~ 5N-1|5N ~ 6N-1|6N ~ 7N-2|7N-1 ~ 8N-2|
+|index|0|N|2N|3N|4N|5N|6N|7N-1|
 
 <a name="fg"></a>
 ### 2.3 `fg` in `FG_eval`
@@ -174,13 +174,18 @@ _code in MPC.cpp line 8~20_
 
 #### 2.3.1 cost defined in `fg[0]`
 
-```
-// initial cost fg[0]
-fg[0] = 0;
-// speed reference
-double ref_v = 35;
+The table below suggests fuctions of each cost costituent:
 
-// cost = cte^2 + epsi^2 + (v-ref_v)^2 + delta^2 + a^2 + D_delta^2 + D_a^2
+|Cost Costituent|Function|
+|:---:|:---|
+|cte², e𝜓²|The cost based on the reference state.|
+|(v - v_ref)²|Punish the car if it stop or halt|
+|𝛿², a²|Minimize the use of actuators|
+|[𝛿(t+1)-𝛿(t)]²<br>[a(t+1)-a(t)]²|Minimize the value gap between sequential actuations|
+
+Thus I define the cost as below:
+
+```
 // The part of the cost based on the reference state.
 for (int t=0; t < N; t++) {
   // cost += cte^2 + epsi^2 + (v - ref_v)^2
@@ -214,8 +219,8 @@ Assuming all variable at time t < 0 is 0, we can get __state[1] - prediction[1|0
 
 |constraints for|x|y|𝜓|v|cte|e𝜓|𝛿|a|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|1st index in `fg`|1+x_start|1+y_start|1+psi_start|1+ v_start|1+cte_start|1+epsi_start|1+delta_start|1+a_start|var[x_start]|
-|1st value|var[x_start]|var[y_start]|var[psi_start]|var[v_start]|
+|1st index in `fg`|1+x_start|1+y_start|1+psi_start|1+v_start|1+cte_start|1+epsi_start|1+delta_start|1+a_start|
+|1st value|var[x_start]|var[y_start]|var[psi_start]|var[v_start]|var[cte_start]|var[epsi_start]|
 
 ##### 2.3.2.1 Set the 2nd ~ Nth value for each variable 
 
@@ -237,27 +242,100 @@ __NOTE__: all index plus 1 because fg[0] is used to store cost.
 <a name="n_var&n_constraints"></a>
 ### 2.4 Model Variables `vars`
 
+The table below shows the components in `vars`:
 
+|variable in `vars`|x|y|𝜓|v|cte|e𝜓|𝛿|a|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|number|N|N|N|N|N|N|N-1|N-1|
+|index|0 ~ N-1|N ~ 2N-1|2N ~ 3N-1|3N ~ 4N-1|4N ~ 5N-1|5N ~ 6N-1|6N ~ 7N-2|7N-1 ~ 8N-2|
+|start index in `vars`|0|N|2N|3N|4N|5N|6N|7N-1|
+|1st item value|state[0]|state[1]|state[2]|state[3]|state[4]|state[5]||
 
 <a name="constraints"></a>
 ### 2.5 Constraints
 
+We want the __reference state[t+1] - prediction[t+1|t]__ to be as closer to 0 as  possible, the same to the cost. So we set all constraints for `fg` to be 0.
+
+```
+for (i=0; i < n_constraints; i++) {
+  constraints_lowerbound[i] = 0;
+  constraints_upperbound[i] = 0;
+}
+```
+
 <a name="variable_limits"></a>
 ### 2.6 Limits for Variables
+
+𝛿 ∈ [-25˚, 25˚]
+
+```
+// TODO: Set lower and upper limits for variables.
+// set the range of values delta to [-25, 25] in radians
+  for (i=delta_start; i < a_start; i++) {
+  vars_lowerbound[i] = -0.436332;  // -25/180 * PI
+  vars_upperbound[i] =  0.436332;  //  25/180 * PI
+}
+```
+a ∈ [-1, 1], where -1 = Full Brake and 1 = Full Acceleration.
+
+```
+// set the range of values a to [-1, 1]
+for (i=a_start; i<n_vars; i++) {
+  vars_lowerbound[i] = -1;
+  vars_upperbound[i] = 1;
+}
+```
 
 <a name="ipopt"></a>
 ### 2.7 IPOpt Returns Actuator Values
 
-Next the optimization solver is called. The solver uses the initial state `[x_1, y_1, psi_1, v_1, cte_1, epsi_1]`, the model constraints and cost function to return a vector of control that minimize the cost function.
+![alt text][image2]
+
+Next the optimization solver is called. The solver uses the initial state `[x1, y1, 𝜓1, v1, cte1, e𝜓1]`, the model constraints and cost function to return a vector of control that minimize the cost function.
 
 The solver we'll use is called __IPOpt__.
 
-**IPOpt**
-
-`solve_result` is a class that contains information about solve problem result. Refering [solve_result.hpp](https://www.coin-or.org/CppAD/Doc/doxydoc/html/solve__result_8hpp_source.html)
+`CppAD::ipopt::solve_result` is a class that contains information about solve problem result. Refering [solve_result.hpp](https://www.coin-or.org/CppAD/Doc/doxydoc/html/solve__result_8hpp_source.html)
 
 ```
 /// the approximation solution
 Dvector x;
 ```
-I use the very first delta and acceleration  in `solve_result.x`.  The structure of `solve_result.x` is similar to `vars`. So the index of the very first delta and acceleration is also `delta_start` and `a_start`.
+I use the very first delta and acceleration  in `solve_result.x`.  The structure of `solve_result.x` is similar to `vars`.
+
+|variable in `solution.x`|x|y|𝜓|v|cte|e𝜓|𝛿|a|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|number|N|N|N|N|N|N|N-1|N-1|
+|index|0 ~ N-1|N ~ 2N-1|2N ~ 3N-1|3N ~ 4N-1|4N ~ 5N-1|5N ~ 6N-1|6N ~ 7N-2|7N-1 ~ 8N-2|
+|start index in `solution.x`|0|N|2N|3N|4N|5N|delta_start = 6N|a_start = 7N-1|
+
+ So the index of the very first delta and acceleration is also `delta_start` and `a_start`.
+
+```
+return {solution.x[delta_start], solution.x[a_start]};
+```
+
+<a name="tune"></a>
+### 2.8 Tuning MPC
+
+Change the code from
+
+```
+// Minimize the value gap between sequential actuations.
+for (int t=0; t < N-2; t++) {
+  // cost += D_delta^2 + D_a^2
+  fg[0] +=       CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+  fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
+}
+```    
+to
+
+```
+// Minimize the value gap between sequential actuations.
+for (int t=0; t < N-2; t++) {
+  // cost += D_delta^2 + D_a^2
+  fg[0] += 500 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+  fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
+}
+``` 
+in order to make the vehicle turn more smoothly.   

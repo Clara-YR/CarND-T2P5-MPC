@@ -157,17 +157,12 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
-          std::cout << "psi = " << psi << std::endl;
           for (int i=0; i<ptsx.size(); i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
             next_x_vals[i] = dx * cos(psi) + dy * sin(psi);
             next_y_vals[i] = dy * cos(psi) - dx * sin(psi);
-            std::cout << "dx = " << dx << ", dy = " << dy << " next_x = " << next_x_vals[i] << ", next_y = " << next_y_vals[i] << std::endl;
           }
-
-          std::cout << "ptsx[5] = " << ptsx[5] << std::endl;
-          std::cout << "next_x_vals[5] = " << next_x_vals[5] << std::endl;
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
