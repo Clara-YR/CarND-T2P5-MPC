@@ -1,12 +1,8 @@
 [//]: # (Image References)
 
-[image0]: ./ReadmeImages/TheGlobalKinematicModel.png "Kinematic Model"
 [image1]: ./ReadmeImages/MPC_setup.png "MPC Setup"
 [image2]: ./ReadmeImages/MPC_loop.png "MPC Loop"
 [image3]: ./ReadmeImages/model.png 
-[image4]: ./ReadmeImages/coordinate_transform.png
-[image5]: ./ReadmeImages/lactency.png 
-[image6]: ./ReadmeImages/delta&a.png 
 
 
 # CarND-Controls-MPC
@@ -43,7 +39,7 @@ Par 2 __Code in MPC.cpp__
 
 
 <a name="coordinate_transformation"></a>
-###1.1 Coordinate Transformation
+### 1.1 Coordinate Transformation
 My reviewers suggested me to convert `ptsx` and `ptsy` from map to car coordinates to make the computation a bit easier since `px`, `py` and `psi` in car coordinates will all be 0.
 
 ```
@@ -61,7 +57,7 @@ for (int i=0; i<ptsx.size(); i++) {
 
 
 <a name="cte_epsi"></a>
-###1.2 Calculate cte and e𝜓
+### 1.2 Calculate cte and e𝜓
 
 Use `polyfit()` to calculate `coeffs`, [reference link](https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl).
 
@@ -93,29 +89,43 @@ double epsi = psi - atan(coeffs[1]);
 
 
 <a name="latency"></a>
-###1.3 Lactency
+### 1.3 Lactency
 
-![alt text][image5]
+In a real car, an actuation command won't execute instantly - there will be a delay as the command propagates through the system. A realistic delay might be on the order of 100 milliseconds.
 
-According to my 1st review I calculate the prediction in 100ms as the input state of MPC instead of the current state.
-
-Thus I need to get `delta` and `a` as below:
-![alt text][image6]
-
-And I also set:
+In order to handle latency, I predict the state of the car 100ms in the future before passing it to the solver:
 
 ```
+// In order to handle latency, predict the state of
+// the car 100ms in the future before passing it to the solver
 const double latency_dt = 0.1;
 const double Lf = 2.67;
+px = v * cos(psi) * latency_dt;  // px = 0 in car coordinate
+py = v * sin(psi) * latency_dt;  // py = 0 in car coordinate
+psi = v * delta / Lf * latency_dt;  // psi = 0 in car coordinate
+double v_ = v + a * latency_dt;
+cte = cte + v * sin(epsi) * latency_dt;
+epsi = epsi - v * delta / Lf * latency_dt;  // psi - psi_des = epsi in car coordinate
+
+Eigen::VectorXd state(6);
+state << px, py, psi, v_, cte, epsi;
 ```
 
 __NOTE__: variable `v_` is created to store the prediciton of v in 100ms. If I use `v = v + a * lantency_dt;` directly, `v` used to calculate predictions of `cte` and `epsi` is actually the prediction of `v` rather than the current value.
 
+Thus I need to get `delta` and `a` as below:
+
+```
+double delta = j[1]["steering_angle"];
+double a = j[1]["throttle"];
+```
+
+
 <a name="steering_throttle"></a>
-###1.4 Calculate Steering Angle and Throttle
+### 1.4 Calculate Steering Angle and Throttle
 
 <a name="visualization"></a>
-###1.5 Visualization
+### 1.5 Visualization
 
 We can display these connected point paths in the simulator by sending a list of optional x and y values to the `mpc_x`, `mpc_y`, `next_x`, and `next_y` fields in the C++ main script.
 
@@ -130,7 +140,7 @@ MPC (model predictive controller)
 ![alt text][image2]
 
 <a name="N&dt"></a>
-###2.1 Set N & dt
+### 2.1 Set N & dt
 
 First, we set up everything for the Model Predictive Control loop. This consist of defining T by choosing N and dt.
 
@@ -147,7 +157,7 @@ double dt = 0.05;
 ```
 
 <a name="start_index"></a>
-###2.2 Start Index
+### 2.2 Start Index
 
 _code in MPC.cpp line 8~20_
 
@@ -157,12 +167,12 @@ _code in MPC.cpp line 8~20_
 |index|0 ~ N-1|N ~ 2N-1|2N ~ 3N-1|3N ~ 4N-1|4N ~ 5N-1|5N ~ 6N-1|6N ~ 7N-2|7N-1 ~ 8N-2|
 
 <a name="fg"></a>
-###2.3 `fg` in `FG_eval`
+### 2.3 `fg` in `FG_eval`
 
 `fg` is the vector of constraints.
 
 
-####2.3.1 cost defined in `fg[0]`
+#### 2.3.1 cost defined in `fg[0]`
 
 ```
 // initial cost fg[0]
@@ -194,11 +204,11 @@ for (int t=0; t < N-2; t++) {
 }
 ```
 
-####2.3.2 vehicle constraints defined in `fg[1~(N-1)]`
+#### 2.3.2 vehicle constraints defined in `fg[1~(N-1)]`
 
 
 
-#####2.3.2.1 Set the 1st value for each variable constraint
+##### 2.3.2.1 Set the 1st value for each variable constraint
 
 Assuming all variable at time t < 0 is 0, we can get __state[1] - prediction[1|0] = state[1]__. The `fg` vector is 1 element larger than `vars` since `fg[0]` stores the cost value. 
 
@@ -207,7 +217,7 @@ Assuming all variable at time t < 0 is 0, we can get __state[1] - prediction[1|0
 |1st index in `fg`|1+x_start|1+y_start|1+psi_start|1+ v_start|1+cte_start|1+epsi_start|1+delta_start|1+a_start|var[x_start]|
 |1st value|var[x_start]|var[y_start]|var[psi_start]|var[v_start]|
 
-#####2.3.2.1 Set the 2nd ~ Nth value for each variable 
+##### 2.3.2.1 Set the 2nd ~ Nth value for each variable 
 
 ![alt text][image3]
 
@@ -225,18 +235,18 @@ fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) + v_0 * delta_0 / Lf * dt
 __NOTE__: all index plus 1 because fg[0] is used to store cost.
 
 <a name="n_var&n_constraints"></a>
-###2.4 Model Variables `vars`
+### 2.4 Model Variables `vars`
 
 
 
 <a name="constraints"></a>
-###2.5 Constraints
+### 2.5 Constraints
 
 <a name="variable_limits"></a>
-###2.6 Limits for Variables
+### 2.6 Limits for Variables
 
 <a name="ipopt"></a>
-###2.7 IPOpt Returns Actuator Values
+### 2.7 IPOpt Returns Actuator Values
 
 Next the optimization solver is called. The solver uses the initial state `[x_1, y_1, psi_1, v_1, cte_1, epsi_1]`, the model constraints and cost function to return a vector of control that minimize the cost function.
 
