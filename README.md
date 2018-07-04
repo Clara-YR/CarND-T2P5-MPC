@@ -27,6 +27,7 @@ Part 1 __Code in main.cpp__
 
 Par 2 __Code in MPC.cpp__
 
+- 2.0 [Variables in MPC.cpp](#variables) 
 - 2.1 [Set N & dt](#N&dt)
 - 2.2 [Start Index](#start_index)
 - 2.3 [`fg` in `FG_eval`](#fg)
@@ -139,6 +140,22 @@ MPC (model predictive controller)
 
 ![alt text][image1]
 
+<a name="variables"></a>
+### 2.0 Variables in MPC.cpp
+
+`FG_eval` class
+
+- `FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }`
+	- `coeffs`-- are the coefficients of the fitted polynominal 	
+- `void operator()(ADvector& fg, const ADvector& vars)`	
+	- `fg`-- where the cost function and vehicle model constraints is defined
+	- `vars`-- is the vector of variables (from the previous section)
+
+`vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)`
+
+- `state`-- the initial state `[x0, y0, 𝜓0, v0, cte0, e𝜓0]`
+- `coeffs`-- are the coefficients of the fitted polynominal 
+
 
 <a name="N&dt"></a>
 ### 2.1 Set N & dt
@@ -182,6 +199,11 @@ The table below suggests fuctions of each cost costituent:
 |(v - v_ref)²|Punish the car if it stop or halt|
 |𝛿², a²|Minimize the use of actuators|
 |[𝛿(t+1)-𝛿(t)]²<br>[a(t+1)-a(t)]²|Minimize the value gap between sequential actuations|
+
+|state cost|actuator cost|value gap cost|
+|:---:|:---:|:---:|
+|cte², e𝜓², (v - v_ref)²|𝛿², a²|[𝛿(t+1)-𝛿(t)]², [a(t+1)-a(t)]²|
+
 
 Thus I define the cost as below:
 
@@ -266,10 +288,19 @@ for (i=0; i < n_constraints; i++) {
 <a name="variable_limits"></a>
 ### 2.6 Limits for Variables
 
+No particular limits for state variables, so I just set them to range -/+infinity
+
+```
+// set the range of state variables to -/+ infinity
+for (unsigned int i = 0; i < delta_start; i++) {
+  vars_lowerbound[i] = -1.79769E+308;
+  vars_upperbound[i] =  1.79769E+308;
+}
+```
+
 𝛿 ∈ [-25˚, 25˚]
 
 ```
-// TODO: Set lower and upper limits for variables.
 // set the range of values delta to [-25, 25] in radians
   for (i=delta_start; i < a_start; i++) {
   vars_lowerbound[i] = -0.436332;  // -25/180 * PI
@@ -291,7 +322,7 @@ for (i=a_start; i<n_vars; i++) {
 
 ![alt text][image2]
 
-Next the optimization solver is called. The solver uses the initial state `[x1, y1, 𝜓1, v1, cte1, e𝜓1]`, the model constraints and cost function to return a vector of control that minimize the cost function.
+Next the optimization solver is called. The solver uses the initial state `[x0, y0, 𝜓0, v0, cte0, e𝜓0]`, the model constraints and cost function to return a vector of control that minimize the cost function.
 
 The solver we'll use is called __IPOpt__.
 
@@ -318,24 +349,6 @@ return {solution.x[delta_start], solution.x[a_start]};
 <a name="tune"></a>
 ### 2.8 Tuning MPC
 
-Change the code from
+See code in MPC.cpp line 49 ~ 73.
 
-```
-// Minimize the value gap between sequential actuations.
-for (int t=0; t < N-2; t++) {
-  // cost += D_delta^2 + D_a^2
-  fg[0] +=       CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
-  fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
-}
-```    
-to
-
-```
-// Minimize the value gap between sequential actuations.
-for (int t=0; t < N-2; t++) {
-  // cost += D_delta^2 + D_a^2
-  fg[0] += 500 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
-  fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
-}
-``` 
-in order to make the vehicle turn more smoothly.   
+  

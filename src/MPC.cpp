@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 25;
+size_t N = 20;
 double dt = 0.05;
 
 // variable start index in `vars`
@@ -47,14 +47,14 @@ class FG_eval {
     // initial cost fg[0]
     fg[0] = 0;
     // speed reference
-    double ref_v = 35;
+    double ref_v = 20;
 
     // cost = cte^2 + epsi^2 + (v-ref_v)^2 + delta^2 + a^2 + D_delta^2 + D_a^2
     // The part of the cost based on the reference state.
     for (int t=0; t < N; t++) {
       // cost += cte^2 + epsi^2 + (v - ref_v)^2
-      fg[0] += CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += 100 * CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += 100 * CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
@@ -68,8 +68,8 @@ class FG_eval {
     // Minimize the value gap between sequential actuations.
     for (int t=0; t < N-2; t++) {
       // cost += D_delta^2 + D_a^2
-      fg[0] += 500 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
-      fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
+      fg[0] += 300 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+      fg[0] += 300 * CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
     }
 
     // set the 1st value for each variable
@@ -79,6 +79,14 @@ class FG_eval {
     fg[1 + v_start] = vars[v_start];
     fg[1 + cte_start] = vars[cte_start];
     fg[1 + epsi_start] = vars[epsi_start];
+
+     /*
+    fg[1 + x_start] = 0;
+    fg[1 + y_start] = 0;
+    fg[1 + psi_start] = 0;
+    fg[1 + v_start] = 0;
+    fg[1 + cte_start] = 0;
+    fg[1 + epsi_start] = 0;*/
 
     // set the 2nd ~ Nth values for each variable
     for (int t=1; t < N; t++) {
@@ -156,13 +164,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_lowerbound(n_vars);
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
+  std::cout << typeid(vars_lowerbound[0]).name() << std::endl;
+  // set the range of state variables to -/+ infinity
+  for (unsigned int i = 0; i < delta_start; i++) {
+    vars_lowerbound[i] = -1.79769E+308;
+    vars_upperbound[i] =  1.79769E+308;
+  }
+
   // set the range of values delta to [-25, 25] in radians
-  for (i=delta_start; i < a_start; i++) {
+  for (unsigned i=delta_start; i < a_start; i++) {
     vars_lowerbound[i] = -0.436332;  // -25/180 * PI
     vars_upperbound[i] =  0.436332;  //  25/180 * PI
   }
   // set the range of values a to [-1, 1]
-  for (i=a_start; i<n_vars; i++) {
+  for (unsigned i=a_start; i<n_vars; i++) {
     vars_lowerbound[i] = -1;
     vars_upperbound[i] = 1;
   }
@@ -217,6 +232,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
+  std::cout << "solution.x = " << solution.x << std::endl;
+  std::cout << "delta = " << solution.x[delta_start] << std::endl;
+  std::cout << "a = " << solution.x[a_start] << std::endl;
 
   return {solution.x[delta_start], solution.x[a_start]};
 }
