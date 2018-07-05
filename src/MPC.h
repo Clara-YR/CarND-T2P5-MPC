@@ -8,8 +8,14 @@ using namespace std;
 
 class MPC {
  public:
+  // MPC predicted x and y
+  vector<double> pre_x;
+  vector<double> pre_y;
+
+  // Constructor
   MPC();
 
+  // Destructor
   virtual ~MPC();
 
   // Solve the model given an initial state and polynomial coefficients.

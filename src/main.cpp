@@ -91,6 +91,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          // for best accuracy, convert the velocity to m/s
+          v = v * 0.44704;
           double delta = j[1]["steering_angle"];
           double a = j[1]["throttle"];
 
@@ -112,15 +114,18 @@ int main() {
           }
 
           // fit the polynominal to the waypoints(in car coordinate)
-          auto coeffs = polyfit(ptsx_c, ptsy_c, 1);
+          auto coeffs = polyfit(ptsx_c, ptsy_c, 3);
           // calculate initial cross track error and orientation error values
           double cte = polyeval(coeffs, 0);
-          double epsi = psi - atan(coeffs[1]);
+          double epsi = - atan(coeffs[1]);
 
           // In order to handle latency, predict the state of
           // the car 100ms in the future before passing it to the solver
           const double latency_dt = 0.1;
           const double Lf = 2.67;
+          // convert v to m/s
+          v = v * 0.44704;
+
           px = v * cos(psi) * latency_dt;  // px = 0 in car coordinate
           py = v * sin(psi) * latency_dt;  // py = 0 in car coordinate
           psi = v * delta / Lf * latency_dt;  // psi = 0 in car coordinate
@@ -142,8 +147,8 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals = mpc.pre_x;
+          vector<double> mpc_y_vals = mpc.pre_y;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -152,16 +157,14 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals(ptsx.size());
-          vector<double> next_y_vals(ptsx.size());
+          vector<double> next_x_vals;
+          vector<double> next_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
           for (int i=0; i<ptsx.size(); i++) {
-            double dx = ptsx[i] - px;
-            double dy = ptsy[i] - py;
-            next_x_vals[i] = dx * cos(psi) + dy * sin(psi);
-            next_y_vals[i] = dy * cos(psi) - dx * sin(psi);
+            next_x_vals.push_back(ptsx_c[i]);
+            next_y_vals.push_back(ptsy_c[i]);
           }
 
           msgJson["next_x"] = next_x_vals;

@@ -19,11 +19,12 @@ It's crucial that we constantly __re-evaluate__ to find the optimal actuations.
 
 Part 1 __Code in main.cpp__
 	
-- 1.1 [Coordinate Transformation](#coordinate_transformation)
-- 1.2 [Calculate cte and e𝜓](#cte_epsi)
-- 1.3 [Latency](#latency)
-- 1.4 [Calculate Steering Angle and Throttle](#steering_throttle)
-- 1.5 [Visualization](#visualization)
+- 1.1 [Convert Coordinate and Unit](#coordinate_unit)
+- 1.2 [Polynominal Order](#polyfit)
+- 1.3 [Calculate cte and e𝜓](#cte_epsi)
+- 1.4 [Latency](#latency)
+- 1.5 [Calculate Steering Angle and Throttle](#steering_throttle)
+- 1.6 [Visualization](#visualization)
 
 Par 2 __Code in MPC.cpp__
 
@@ -40,8 +41,8 @@ Par 2 __Code in MPC.cpp__
 ## Part 1. Code in main.cpp
 
 
-<a name="coordinate_transformation"></a>
-### 1.1 Coordinate Transformation
+<a name="coordinate_unit"></a>
+### 1.1 Convert Coordinate and Unit
 My reviewers suggested me to convert `ptsx` and `ptsy` from map to car coordinates to make the computation a bit easier since `px`, `py` and `psi` in car coordinates will all be 0.
 
 ```
@@ -56,10 +57,24 @@ for (int i=0; i<ptsx.size(); i++) {
 }
 ```
 
+For best accuracy, convert the velocity to m/s and doing all subsequent computations with this value. `v` should be multiply by __0.44704__.
 
+```
+double v = j[1]["speed"] * 0.44704;
+```
+
+<a name="polyfit"></a>
+### 1.2 Polynomial Order
+
+The reference trajectory is typically passed to the control block as a polynomial. This polynomial is usually 3rd order, since third order polynomials will fit trajectories for most roads. 
+
+```
+// fit the polynominal to the waypoints(in car coordinate)
+auto coeffs = polyfit(ptsx_c, ptsy_c, 3);
+```
 
 <a name="cte_epsi"></a>
-### 1.2 Calculate cte and e𝜓
+### 1.3 Calculate cte and e𝜓
 
 Use `polyfit()` to calculate `coeffs`, [reference link](https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl).
 
@@ -75,23 +90,22 @@ __e𝜓__ can be calculated as the tangential angle of the polynominal f evaluat
 
 ```
 e𝜓  = 𝜓 - 𝜓des
-	= 𝜓 - arctan(f'(x))
+	= 0 - arctan(f'(x))
+	= - arctan(f'(x))
 since f(x) = a1 + a0 * x, arctan(f'(x)) = arctan(a0)
-thus e𝜓 = 𝜓 - arctan(a0)
+thus e𝜓 = - arctan(a0)
 ```
 My code is:
 
 ```
-// fit the polynominal to the waypoints(in car coordinate)
-auto coeffs = polyfit(ptsx_c, ptsy_c, 1);
 // calculate initial cross track error and orientation error values
 double cte = polyeval(coeffs, 0);
-double epsi = psi - atan(coeffs[1]);
+double epsi = - atan(coeffs[1]);
 ```
 
 
 <a name="latency"></a>
-### 1.3 Lactency
+### 1.4 Lactency
 
 In a real car, an actuation command won't execute instantly - there will be a delay as the command propagates through the system. A realistic delay might be on the order of 100 milliseconds.
 
@@ -124,10 +138,10 @@ double a = j[1]["throttle"];
 
 
 <a name="steering_throttle"></a>
-### 1.4 Calculate Steering Angle and Throttle
+### 1.5 Calculate Steering Angle and Throttle
 
 <a name="visualization"></a>
-### 1.5 Visualization
+### 1.6 Visualization
 
 We can display these connected point paths in the simulator by sending a list of optional x and y values to the `mpc_x`, `mpc_y`, `next_x`, and `next_y` fields in the C++ main script.
 

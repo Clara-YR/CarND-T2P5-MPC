@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 20;
+size_t N = 25;
 double dt = 0.05;
 
 // variable start index in `vars`
@@ -47,28 +47,28 @@ class FG_eval {
     // initial cost fg[0]
     fg[0] = 0;
     // speed reference
-    double ref_v = 20;
+    double ref_v = 35;
 
     // cost = cte^2 + epsi^2 + (v-ref_v)^2 + delta^2 + a^2 + D_delta^2 + D_a^2
     // The part of the cost based on the reference state.
     for (int t=0; t < N; t++) {
       // cost += cte^2 + epsi^2 + (v - ref_v)^2
-      fg[0] += 100 * CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += 100 * CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += 100 * CppAD::pow(vars[v_start + t] - ref_v, 2);
+      fg[0] += CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
     for (int t=0; t < N-1; t++) {
       // cost += delta^2 + a^2
       fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 10 * CppAD::pow(vars[a_start + t], 2);
+      fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
     for (int t=0; t < N-2; t++) {
       // cost += D_delta^2 + D_a^2
-      fg[0] += 1000 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+      fg[0] += CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
       fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
     }
 
@@ -79,14 +79,6 @@ class FG_eval {
     fg[1 + v_start] = vars[v_start];
     fg[1 + cte_start] = vars[cte_start];
     fg[1 + epsi_start] = vars[epsi_start];
-
-     /*
-    fg[1 + x_start] = 0;
-    fg[1 + y_start] = 0;
-    fg[1 + psi_start] = 0;
-    fg[1 + v_start] = 0;
-    fg[1 + cte_start] = 0;
-    fg[1 + epsi_start] = 0;*/
 
     // set the 2nd ~ Nth values for each variable
     for (int t=1; t < N; t++) {
@@ -232,9 +224,32 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  std::cout << "solution.x = " << solution.x << std::endl;
-  std::cout << "delta = " << solution.x[delta_start] << std::endl;
-  std::cout << "a = " << solution.x[a_start] << std::endl;
+
+  // predict trajectory using delta and a in solution
+  double x = state[0];
+  double y = state[1];
+  double psi = state[2];
+  double v = state[3];
+  double cte = state[4];
+  double epsi = state[5];
+  double delta = solution.x[delta_start];
+  double a = solution.x[a_start];
+
+  pre_x.clear();
+  pre_y.clear();
+  for (int t=0; t < 5; t++) {
+    x = x + v * cos(psi) * 1.0;
+    y = y + v * sin(psi) * 1.0;
+    psi = psi - v * delta / Lf * 1.0;  // delta is positive we rotate counter-clockwise, or turn left
+    double f = coeffs[0] + coeffs[1] * 1.0;
+    double psi_des = atan(coeffs[1]);
+    cte = (f - y) + (v * sin(epsi) * 1.0);
+    epsi = (psi - psi_des) + v * delta / Lf * 1.0;
+    v = v + a * 1.0;
+
+    pre_x.push_back(x);
+    pre_y.push_back(y);
+  }
 
   return {solution.x[delta_start], solution.x[a_start]};
 }
