@@ -170,6 +170,8 @@ We can display these connected point paths in the simulator by sending a list of
 
 The `mpc_x` and `mpc_y` variables display a line projection in green. The `next_x` and `next_y` variables display a line projection in yellow.
 
+- Next Points
+
 ```
 double poly_inc = 2.5;
 int num_points = 25;
@@ -178,7 +180,37 @@ for (int i=1; i<num_points; i++) {
   next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
 }
 ```
+- MPC Predicted )oints
 
+I added public variables `pred_x` and `pred_y` to store the trajectory points predicted by MPC. 
+
+Add in `MPC.h`:
+
+```
+vector<double> pred_x;
+vector<double> pred_y;
+```
+
+Push the predicted x and y from `solution.x` to `pred_x` and `pred_y`
+
+```
+// clear all the previous values
+pred_x.clear();
+pred_y.clear();
+// push the new predictions in
+for (int t=0; t<N; t++) {
+  pred_x.push_back(solution.x[x_start + t]);
+  pred_y.push_back(solution.x[y_start + t]);
+}
+```
+
+Call them in main.cpp:
+
+```
+//Display the MPC predicted trajectory
+vector<double> mpc_x_vals = mpc.pred_x;
+vector<double> mpc_y_vals = mpc.pred_y;
+```    
 
 ## Part 2. Code in MPC.cpp
 
@@ -254,7 +286,7 @@ The table below suggests fuctions of each cost costituent:
 |cte², e𝜓², (v - v_ref)²|𝛿², a²|[𝛿(t+1)-𝛿(t)]², [a(t+1)-a(t)]²|
 
 
-Thus I define the cost as below:
+Thus I defined the cost as below:
 
 ```
 // The part of the cost based on the reference state.
@@ -275,14 +307,13 @@ for (int t=0; t < N-1; t++) {
 // Minimize the value gap between sequential actuations.
 for (int t=0; t < N-2; t++) {
   // cost += D_delta^2 + D_a^2
-  fg[0] += 500 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
+  fg[0] += CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);  // TUNE here !
   fg[0] += CppAD::pow((vars[a_start + t+1] - vars[a_start + t]), 2);
 }
 ```
+I would tune the code later to prevent the vehicle from steering off the road or possibly crashing. See details in 2.8 [Tuning MPC](#tune)
 
 #### 2.3.2 vehicle constraints defined in `fg[1~(N-1)]`
-
-
 
 ##### 2.3.2.1 Set the 1st value for each variable constraint
 
@@ -325,13 +356,28 @@ The table below shows the components in `vars`:
 <a name="constraints"></a>
 ### 2.5 Constraints
 
-We want the __reference state[t+1] - prediction[t+1|t]__ to be as closer to 0 as  possible, the same to the cost. So we set all constraints for `fg` to be 0.
+We want the __reference state[t+1] - prediction[t+1|t]__ to be as closer to 0 as  possible, the same to the cost. So we set all constraints for `fg` to be 0 except the constriants of intial value of each variable.
 
 ```
 for (i=0; i < n_constraints; i++) {
   constraints_lowerbound[i] = 0;
   constraints_upperbound[i] = 0;
 }
+
+// initial state
+constraints_lowerbound[x_start] = state[0];
+constraints_lowerbound[y_start] = state[1];
+constraints_lowerbound[psi_start] = state[2];
+constraints_lowerbound[v_start] = state[3];
+constraints_lowerbound[cte_start] = state[4];
+constraints_lowerbound[epsi_start] = state[5];
+
+constraints_upperbound[x_start] = state[0];
+constraints_upperbound[y_start] = state[1];
+constraints_upperbound[psi_start] = state[2];
+constraints_upperbound[v_start] = state[3];
+constraints_upperbound[cte_start] = state[4];
+constraints_upperbound[epsi_start] = state[5];
 ```
 
 <a name="variable_limits"></a>
@@ -352,8 +398,8 @@ for (unsigned int i = 0; i < delta_start; i++) {
 ```
 // set the range of values delta to [-25, 25] in radians
   for (unsigned i=delta_start; i < a_start; i++) {
-  vars_lowerbound[i] = -0.436332 * Lf;  // -25/180 * PI
-  vars_upperbound[i] =  0.436332 * Lf;  //  25/180 * PI
+  vars_lowerbound[i] = -0.436332;  // -25/180 * PI
+  vars_upperbound[i] =  0.436332;  //  25/180 * PI
 }
 ```
 a ∈ [-1, 1], where -1 = Full Brake and 1 = Full Acceleration.
@@ -399,5 +445,12 @@ return {solution.x[delta_start], solution.x[a_start]};
 ### 2.8 Tuning MPC
 
 See code in MPC.cpp line 49 ~ 73.
+
+I multiplied `a²` by __50__ and `(𝛿[t+1]-𝛿[t])²` by __10000__ as below:
+
+`fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);`
+`fg[0] += 10000 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);`
+
+
 
   

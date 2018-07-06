@@ -120,7 +120,7 @@ class FG_eval {
       fg[1 + psi_start + t] = psi_1 - (psi_0 - v_0 * delta_0 / Lf * dt);  // delta is positive we rotate counter-clockwise, or turn left
       fg[1 + v_start + t] = v_1 - (v_0 + a_0 * dt);
       fg[1 + cte_start + t] = cte_1 - ((f_0 - y_0) + (v_0 * CppAD::sin(epsi_0) * dt));
-      fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) - v_0 * delta_0 / Lf * dt);
+      fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) + v_0 * delta_0 / Lf * dt);
     }
   }
 };
@@ -253,9 +253,10 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
 
+  // clear all the previous values
   pred_x.clear();
   pred_y.clear();
-
+  // push the new predictions in
   for (int t=0; t<N; t++) {
     pred_x.push_back(solution.x[x_start + t]);
     pred_y.push_back(solution.x[y_start + t]);
