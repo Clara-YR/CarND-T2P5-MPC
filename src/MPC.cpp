@@ -66,7 +66,7 @@ class FG_eval {
     for (int t=0; t < N-1; t++) {
       // cost += delta^2 + a^2
       fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);
+      fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
@@ -112,7 +112,7 @@ class FG_eval {
       AD<double> a_0 = vars[a_start + t-1];
 
       AD<double> f_0 = coeffs[0] + coeffs[1] * x_0 + coeffs[2] * pow(x_0, 2) + coeffs[3] * pow(x_0, 3);
-      AD<double> psi_des_0 = CppAD::atan(coeffs[1] + 2 * x_0 * coeffs[2] + 2 * pow(x_0,2) * coeffs[3]);
+      AD<double> psi_des_0 = CppAD::atan(coeffs[1] + 2 * x_0 * coeffs[2] + 3 * pow(x_0,2) * coeffs[3]);
 
       // constraints = state[t+1] - prediction[t+1|t]
       fg[1 + x_start + t] = x_1 - (x_0 + v_0 * CppAD::cos(psi_0) * dt);

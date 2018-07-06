@@ -141,16 +141,20 @@ const double latency_dt = 0.1;
 const double Lf = 2.67;
 px = v * cos(psi) * latency_dt;  // px = 0 in car coordinate
 py = v * sin(psi) * latency_dt;  // py = 0 in car coordinate
-psi = v * delta / Lf * latency_dt;  // psi = 0 in car coordinate
+psi = v * (-delta) / Lf * latency_dt;  // psi = 0 in car coordinate
 double v_ = v + a * latency_dt;
 cte = cte + v * sin(epsi) * latency_dt;
-epsi = epsi - v * delta / Lf * latency_dt;  // psi - psi_des = epsi in car coordinate
+epsi = epsi + v * (-delta) / Lf * latency_dt;  // psi - psi_des = epsi in car coordinate
 
 Eigen::VectorXd state(6);
 state << px, py, psi, v_, cte, epsi;
 ```
 
-__NOTE__: variable `v_` is created to store the prediciton of v in 100ms. If I use `v = v + a * lantency_dt;` directly, `v` used to calculate predictions of `cte` and `epsi` is actually the prediction of `v` rather than the current value.
+__NOTE__: 
+
+- 𝛿 = __- delta__ in this project 
+ 
+- variable `v_` is created to store the prediciton of v in 100ms. If I use `v = v + a * lantency_dt;` directly, `v` used to calculate predictions of `cte` and `epsi` is actually the prediction of `v` rather than the current value.
 
 Thus I need to get `delta` and `a` as below:
 
@@ -446,9 +450,8 @@ return {solution.x[delta_start], solution.x[a_start]};
 
 See code in MPC.cpp line 49 ~ 73.
 
-I multiplied `a²` by __50__ and `(𝛿[t+1]-𝛿[t])²` by __10000__ as below:
+I multiplied `(𝛿[t+1]-𝛿[t])²` by __10000__ as below:
 
-`fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);`
 `fg[0] += 10000 * CppAD::pow((vars[delta_start + t+1] - vars[delta_start + t]), 2);`
 
 
