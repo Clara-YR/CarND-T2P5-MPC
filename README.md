@@ -1,5 +1,6 @@
 [//]: # (Image References)
 
+[image0]: ./ReadmeImages/vehicle_coordinate.png 
 [image1]: ./ReadmeImages/MPC_setup.png "MPC Setup"
 [image2]: ./ReadmeImages/MPC_loop.png "MPC Loop"
 [image3]: ./ReadmeImages/Model.png 
@@ -45,28 +46,47 @@ Par 2 __Code in MPC.cpp__
 ### 1.1 Convert Coordinate and Unit
 My reviewers suggested me to convert `ptsx` and `ptsy` from map to car coordinates to make the computation a bit easier since `px`, `py` and `psi` in car coordinates will all be 0.
 
+![alt text][image0] 
+
 ```
 // convert from map to coordinates, px, py, psi = 0
-Eigen::VectorXd ptsx_c(ptsx.size());
-Eigen::VectorXd ptsy_c(ptsx.size());
 for (int i=0; i<ptsx.size(); i++) {
-	double dx = ptsx[i] - px;
-	double dy = ptsy[i] - py;
-	ptsx_c[i] = dx * cos(psi) + dy * sin(psi);
-	ptsy_c[i] = dy * cos(psi) - dx * sin(psi);
+
+  // shift x,y of car position to 0
+  double x_shift = ptsx[i] - px;
+  double y_shift = ptsy[i] - py;
+
+  // shift car reference angle to 90 degree
+  ptsx[i] = x_shift * cos(0 - psi) - y_shift * sin(0 - psi);
+  ptsy[i] = x_shift * sin(0 - psi) + y_shift * cos(0 - psi);
 }
 ```
 
-For best accuracy, convert the velocity to m/s and doing all subsequent computations with this value. `v` should be multiply by __0.44704__.
+The unit of `j[1]["speed"]` is miles/hour.
+
+- 1 miles/hour = 1609meters / 3600seconds = 0.44704 m/s
+
+Hence for best accuracy, convert the velocity to m/s multiplying by __0.44704__ and doing all subsequent computations with this value.
 
 ```
-double v = j[1]["speed"] * 0.44704;
+double v = j[1]["speed"];
+// for best accuracy, convert the velocity to m/s
+v = v * 0.44704;
 ```
 
 <a name="polyfit"></a>
 ### 1.2 Polynomial Order
 
-The reference trajectory is typically passed to the control block as a polynomial. This polynomial is usually 3rd order, since third order polynomials will fit trajectories for most roads. 
+__NOTE__: `ptsx` and `ptxy` are in `vector` form, but `polyfit()` requires inputs in `Eigen::VectorXd` form. So firstly we need to do as below:
+
+```
+double* ptrx = &ptsx[0];
+Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
+double* ptry = &ptsy[0];
+Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
+```
+
+The reference trajectory is typically passed to the control block as a polynomial. This polynomial is usually __3rd order__, since third order polynomials will fit trajectories for most roads. 
 
 ```
 // fit the polynominal to the waypoints(in car coordinate)
@@ -82,18 +102,21 @@ __cte__ calculation in car coordinate can be simplified as below:
 
 ```
 cte = f(x) - y
-	= polyeval(coeffs, px) - py 
+ 	= polyeval(coeffs, px) - py 
 	= polyeval(coeffs, 0) - 0 
 	= polyeval(coeffs, 0)
-```
+```	
+
 __e𝜓__ can be calculated as the tangential angle of the polynominal f evaluated at xt, therefore e𝜓 calculation can be simplified as below:
 
 ```
 e𝜓  = 𝜓 - 𝜓des
 	= 0 - arctan(f'(x))
 	= - arctan(f'(x))
-since f(x) = a1 + a0 * x, arctan(f'(x)) = arctan(a0)
-thus e𝜓 = - arctan(a0)
+since f(x) = a0 + a1 * x + a2 * x^2 + a3 * x^3
+arctan(f'(x)) = arctan(a1 + 2x * a2 + 3x^2 * a3)
+thus when px = 0 we can get
+e𝜓 = - arctan(a1)
 ```
 My code is:
 
@@ -147,6 +170,15 @@ We can display these connected point paths in the simulator by sending a list of
 
 The `mpc_x` and `mpc_y` variables display a line projection in green. The `next_x` and `next_y` variables display a line projection in yellow.
 
+```
+double poly_inc = 2.5;
+int num_points = 25;
+for (int i=1; i<num_points; i++) {
+  next_x_vals.push_back(poly_inc*i);
+  next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
+}
+```
+
 
 ## Part 2. Code in MPC.cpp
 
@@ -181,6 +213,9 @@ __T__ -- prediction horizon T = N x dt, the duration over which future predictio
 __N__ -- the number of timesteps in the horizon
 
 ___dt___ -- how much time elapsed between actuations
+
+T should be as large as possible, while dt should be as small as possible.
+In the case of driving a car, T should be a few seconds, at most. Beyond that horizon, the environment will change enough that it won't make sense to predict any further into the future.
 
 ```
 // TODO: Set the timestep length and duration
@@ -316,16 +351,16 @@ for (unsigned int i = 0; i < delta_start; i++) {
 
 ```
 // set the range of values delta to [-25, 25] in radians
-  for (i=delta_start; i < a_start; i++) {
-  vars_lowerbound[i] = -0.436332;  // -25/180 * PI
-  vars_upperbound[i] =  0.436332;  //  25/180 * PI
+  for (unsigned i=delta_start; i < a_start; i++) {
+  vars_lowerbound[i] = -0.436332 * Lf;  // -25/180 * PI
+  vars_upperbound[i] =  0.436332 * Lf;  //  25/180 * PI
 }
 ```
 a ∈ [-1, 1], where -1 = Full Brake and 1 = Full Acceleration.
 
 ```
 // set the range of values a to [-1, 1]
-for (i=a_start; i<n_vars; i++) {
+for (unsigned i=a_start; i<n_vars; i++) {
   vars_lowerbound[i] = -1;
   vars_upperbound[i] = 1;
 }

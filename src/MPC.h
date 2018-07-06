@@ -8,9 +8,9 @@ using namespace std;
 
 class MPC {
  public:
-  // MPC predicted x and y
-  vector<double> pre_x;
-  vector<double> pre_y;
+  // x, y predicted by MPC in vehicle coordinate
+  vector<double> pred_x;
+  vector<double> pred_y;
 
   // Constructor
   MPC();
