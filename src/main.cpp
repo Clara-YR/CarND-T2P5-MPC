@@ -168,6 +168,7 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+
           double poly_inc = 2.5;
           int num_points = 25;
           for (int i=1; i<num_points; i++) {

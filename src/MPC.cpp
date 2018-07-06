@@ -24,7 +24,7 @@ const double Lf = 2.67;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 100;
+double ref_v = 20;
 
 // variable start index in `vars`
 size_t x_start = 0;
@@ -66,7 +66,7 @@ class FG_eval {
     for (int t=0; t < N-1; t++) {
       // cost += delta^2 + a^2
       fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
@@ -112,7 +112,7 @@ class FG_eval {
       AD<double> a_0 = vars[a_start + t-1];
 
       AD<double> f_0 = coeffs[0] + coeffs[1] * x_0 + coeffs[2] * pow(x_0, 2) + coeffs[3] * pow(x_0, 3);
-      AD<double> psi_des_0 = CppAD::atan(coeffs[1] + 2*x_0*coeffs[2] + 2*pow(x_0,2)*coeffs[3]);
+      AD<double> psi_des_0 = CppAD::atan(coeffs[1] + 2 * x_0 * coeffs[2] + 2 * pow(x_0,2) * coeffs[3]);
 
       // constraints = state[t+1] - prediction[t+1|t]
       fg[1 + x_start + t] = x_1 - (x_0 + v_0 * CppAD::cos(psi_0) * dt);
@@ -120,7 +120,7 @@ class FG_eval {
       fg[1 + psi_start + t] = psi_1 - (psi_0 - v_0 * delta_0 / Lf * dt);  // delta is positive we rotate counter-clockwise, or turn left
       fg[1 + v_start + t] = v_1 - (v_0 + a_0 * dt);
       fg[1 + cte_start + t] = cte_1 - ((f_0 - y_0) + (v_0 * CppAD::sin(epsi_0) * dt));
-      fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) + v_0 * delta_0 / Lf * dt);
+      fg[1 + epsi_start + t] = epsi_1 - ((psi_0 - psi_des_0) - v_0 * delta_0 / Lf * dt);
     }
   }
 };
