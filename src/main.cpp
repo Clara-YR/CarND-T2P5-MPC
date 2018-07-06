@@ -142,7 +142,6 @@ int main() {
           state << px, py, psi, v_, cte, epsi;
 
           auto control = mpc.Solve(state, coeffs);  // both state and coeffs are calculated in car coordinate
-          std::cout << "delta = " << control[0] << ", a = " << control[1] << std::endl;
           double steer_value = control[0];
           double throttle_value = control[1];
 
