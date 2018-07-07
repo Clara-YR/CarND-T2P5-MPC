@@ -20,7 +20,7 @@ It's crucial that we constantly __re-evaluate__ to find the optimal actuations.
 
 Part 1 __Code in main.cpp__
 	
-- 1.1 [Convert Coordinate and Unit](#coordinate_unit)
+- 1.1 [Convert Coordinate and Unit and +/-](#coordinate_unit)
 - 1.2 [Polynominal Order](#polyfit)
 - 1.3 [Calculate cte and e𝜓](#cte_epsi)
 - 1.4 [Latency](#latency)
@@ -44,6 +44,9 @@ Par 2 __Code in MPC.cpp__
 
 <a name="coordinate_unit"></a>
 ### 1.1 Convert Coordinate and Unit
+
+#### 1.1.1 Map to Car Coordinate
+
 My reviewers suggested me to convert `ptsx` and `ptsy` from map to car coordinates to make the computation a bit easier since `px`, `py` and `psi` in car coordinates will all be 0.
 
 ![alt text][image0] 
@@ -61,6 +64,7 @@ for (int i=0; i<ptsx.size(); i++) {
   ptsy[i] = x_shift * sin(0 - psi) + y_shift * cos(0 - psi);
 }
 ```
+#### 1.1.2 velocity unit: miles/hour -> m/s 
 
 The unit of `j[1]["speed"]` is miles/hour.
 
@@ -70,8 +74,15 @@ Hence for best accuracy, convert the velocity to m/s multiplying by __0.44704__ 
 
 ```
 double v = j[1]["speed"];
-// for best accuracy, convert the velocity to m/s
-v = v * 0.44704;
+v = v * 0.44704;  // for best accuracy, convert the velocity to m/s
+```
+#### 1.1.3 +/- 𝛅
+
+Note if δ is positive we rotate counter-clockwise, or turn left. In the simulator however, a positive value implies a right turn and a negative value implies a left turn. So we need to multiply the steering value by -1 before sending it back to the server.
+
+```
+double delta = j[1]["steering_angle"];
+delta = delta * (-1);
 ```
 
 <a name="polyfit"></a>

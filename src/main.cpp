@@ -91,9 +91,9 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-          // for best accuracy, convert the velocity to m/s
-          v = v * 0.44704;
+          v = v * 0.44704;   // for best accuracy, convert the velocity to m/s
           double delta = j[1]["steering_angle"];
+          delta = delta * (-1);
           double a = j[1]["throttle"];
 
           /*
@@ -132,10 +132,10 @@ int main() {
           const double Lf = 2.67;
           px = v * cos(psi) * latency_dt;  // px = 0 in car coordinate
           py = v * sin(psi) * latency_dt;  // py = 0 in car coordinate
-          psi = v * （-delta） / Lf * latency_dt;  // psi = 0 in car coordinate
+          psi = v * delta / Lf * latency_dt;  // psi = 0 in car coordinate
           double v_ = v + a * latency_dt;
           cte = cte + v * sin(epsi) * latency_dt;
-          epsi = epsi + v * （-delta) / Lf * latency_dt;  // psi - psi_des = epsi in car coordinate
+          epsi = epsi + v * delta / Lf * latency_dt;  // psi - psi_des = epsi in car coordinate
 
           Eigen::VectorXd state(6);
           state << px, py, psi, v_, cte, epsi;
